@@ -19,6 +19,7 @@ Full Release Notes:
 
  - DepthMap: Bug fix if no nearby cameras (a big bottleneck of the release 2019.1). [PR](https://github.com/alicevision/AliceVision/pull/616)
  - DepthMap: Bug fix: missing allocation when reducing the number of planes. [PR](https://github.com/alicevision/AliceVision/pull/642)
+ - DepthMap: Bug fix: SGM early stop condition could provide an unallocated buffer to the refine step [PR](https://github.com/alicevision/AliceVision/pull/671)
  - FeatureExtraction: Bug fix in AKAZE filtering (sort keypoints by size before grid filtering). [PR](https://github.com/alicevision/AliceVision/pull/635)
  - FeatureMatching: Bug fix: use ranges prefix to avoid overwrites of matching files when using ImageMatching. [PR](https://github.com/alicevision/AliceVision/pull/628)
  - SfM: Improve SfM colorization performances. [PR](https://github.com/alicevision/AliceVision/pull/597)
