@@ -71,7 +71,7 @@ public:
     // Local Bundle Adjustment data
 
     /// The minimum number of shared matches to create an edge between two views (nodes)
-    const std::size_t kMinNbOfMatches = 50;
+    std::size_t kMinNbOfMatches = 50;
 
     // Intermediate reconstructions
     /// extension of the intermediate reconstruction files
