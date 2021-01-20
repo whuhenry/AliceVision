@@ -11,8 +11,9 @@
 #include <iostream>
 
 #define BOOST_TEST_MODULE LIGHTING_ESTIMATION
-#include <boost/test/included/unit_test.hpp>
-#include <boost/test/floating_point_comparison.hpp>
+
+#include <boost/test/unit_test.hpp>
+#include <boost/test/tools/floating_point_comparison.hpp>
 
 #include <aliceVision/unitTest.hpp>
 
@@ -66,8 +67,11 @@ BOOST_AUTO_TEST_CASE(LIGHTING_ESTIMATION_Lambertian_GT)
   }
 
   // Retrieve unknown lighting
+  LighthingEstimator estimator;
   LightingVector lightingEst;
-  estimateLigthing(lightingEst, albedoSynt, pictureGenerated, normalsSynt);
+
+  estimator.addImage(albedoSynt, pictureGenerated, normalsSynt);
+  estimator.estimateLigthing(lightingEst);
 
   const float epsilon = 1e-3f;
   EXPECT_MATRIX_NEAR(lightingEst, lightingSynt, epsilon);
@@ -116,8 +120,11 @@ BOOST_AUTO_TEST_CASE(LIGHTING_ESTIMATION_Lambertian_noise)
   }
 
   // Retrieve unknown lighting
+  LighthingEstimator estimator;
   LightingVector lightingEst;
-  estimateLigthing(lightingEst, albedoSynt, pictureGenerated, normalsSynt);
+
+  estimator.addImage(albedoSynt, pictureGenerated, normalsSynt);
+  estimator.estimateLigthing(lightingEst);
 
   const float epsilon = 1e-2f;
   EXPECT_MATRIX_NEAR(lightingEst, lightingSynt, epsilon);

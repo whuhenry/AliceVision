@@ -11,9 +11,13 @@
 #include <aliceVision/sfmData/colorize.hpp>
 
 #include <string>
+#include <random>
 
 namespace aliceVision {
 namespace sfm {
+
+void retrieveMarkersId(sfmData::SfMData& sfmData);
+
 
 /**
  * @brief Basic Reconstruction Engine.
@@ -68,12 +72,25 @@ public:
     sfmData::colorizeTracks(_sfmData);
   }
 
+  void retrieveMarkersId()
+  {
+      aliceVision::sfm::retrieveMarkersId(_sfmData);
+  }
+
+  void initRandomSeed(int seed)
+  {
+      _randomNumberGenerator.seed(seed == -1 ? std::random_device()() : seed);
+  }
+
 protected:
   /// Output folder where outputs will be stored
   std::string _outputFolder;
   /// Internal SfMData
   sfmData::SfMData _sfmData;
+  //Random engine
+  std::mt19937 _randomNumberGenerator;
 };
+
 
 } // namespace sfm
 } // namespace aliceVision

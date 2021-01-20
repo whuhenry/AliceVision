@@ -11,7 +11,7 @@
 #include <aliceVision/multiview/translationAveraging/common.hpp>
 #include <aliceVision/feature/FeaturesPerView.hpp>
 #include <aliceVision/sfm/pipeline/pairwiseMatchesIO.hpp>
-#include <aliceVision/track/Track.hpp>
+#include <aliceVision/track/TracksBuilder.hpp>
 #include <aliceVision/graph/graph.hpp>
 
 namespace aliceVision {
@@ -23,6 +23,42 @@ enum ETranslationAveragingMethod
   TRANSLATION_AVERAGING_L2_DISTANCE_CHORDAL = 2,
   TRANSLATION_AVERAGING_SOFTL1 = 3
 };
+
+inline std::string ETranslationAveragingMethod_enumToString(ETranslationAveragingMethod eTranslationAveragingMethod)
+{
+  switch(eTranslationAveragingMethod)
+  {
+    case ETranslationAveragingMethod::TRANSLATION_AVERAGING_L1:
+      return "L1_minimization";
+    case ETranslationAveragingMethod::TRANSLATION_AVERAGING_L2_DISTANCE_CHORDAL:
+      return "L2_minimization";
+  case ETranslationAveragingMethod::TRANSLATION_AVERAGING_SOFTL1:
+    return "L1_soft_minimization";
+  }
+  throw std::out_of_range("Invalid translation averaging method type");
+}
+
+inline ETranslationAveragingMethod ETranslationAveragingMethod_stringToEnum(const std::string& TranslationAveragingMethodName)
+{
+  if(TranslationAveragingMethodName == "L1_minimization")      return ETranslationAveragingMethod::TRANSLATION_AVERAGING_L1;
+  if(TranslationAveragingMethodName == "L2_minimization")   return ETranslationAveragingMethod::TRANSLATION_AVERAGING_L2_DISTANCE_CHORDAL;
+  if(TranslationAveragingMethodName == "L1_soft_minimization")      return ETranslationAveragingMethod::TRANSLATION_AVERAGING_SOFTL1;
+
+  throw std::out_of_range("Invalid translation averaging method name : '" + TranslationAveragingMethodName + "'");
+}
+
+inline std::ostream& operator<<(std::ostream& os, ETranslationAveragingMethod e)
+{
+    return os << ETranslationAveragingMethod_enumToString(e);
+}
+
+inline std::istream& operator>>(std::istream& in, ETranslationAveragingMethod& translationType)
+{
+    std::string token;
+    in >> token;
+    translationType = ETranslationAveragingMethod_stringToEnum(token);
+    return in;
+}
 
 class GlobalSfMTranslationAveragingSolver
 {
@@ -38,6 +74,7 @@ public:
            const feature::FeaturesPerView& normalizedFeaturesPerView,
            const matching::PairwiseMatches& pairwiseMatches,
            const HashMap<IndexT, Mat3>& map_globalR,
+           std::mt19937 & randomNumberGenerator,
            matching::PairwiseMatches& tripletWise_matches);
 
 private:
@@ -49,6 +86,7 @@ private:
            const feature::FeaturesPerView& normalizedFeaturesPerView,
            const matching::PairwiseMatches& pairwiseMatches,
            const HashMap<IndexT, Mat3>& map_globalR,
+           std::mt19937 & randomNumberGenerator,
            matching::PairwiseMatches& tripletWise_matches);
 
   /**
@@ -61,6 +99,7 @@ private:
            const HashMap<IndexT, Mat3>& map_globalR,
            const feature::FeaturesPerView& normalizedFeaturesPerView,
            const matching::PairwiseMatches& pairwiseMatches,
+           std::mt19937 & randomNumberGenerator,
            translationAveraging::RelativeInfoVec& vec_initialEstimates,
            matching::PairwiseMatches& newpairMatches);
 
@@ -72,6 +111,7 @@ private:
            const feature::FeaturesPerView& normalizedFeaturesPerView,
            const matching::PairwiseMatches& pairwiseMatches,
            const graph::Triplet& poses_id,
+           std::mt19937 & randomNumberGenerator,
            std::vector<Vec3>& vec_tis,
            double& precision, // UpperBound of the precision found by the AContrario estimator
            std::vector<size_t>& vec_inliers,

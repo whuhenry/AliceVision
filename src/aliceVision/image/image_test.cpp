@@ -10,8 +10,9 @@
 #include <iostream>
 
 #define BOOST_TEST_MODULE Image
-#include <boost/test/included/unit_test.hpp>
-#include <boost/test/floating_point_comparison.hpp>
+
+#include <boost/test/unit_test.hpp>
+#include <boost/test/tools/floating_point_comparison.hpp>
 
 using namespace std;
 using namespace aliceVision;
@@ -71,7 +72,7 @@ BOOST_AUTO_TEST_CASE(Image_PixelTypes)
   // RGBColor  c(0); // Not accepted because can cause bad pixel affectation value (mixed type...)
   // The following issue must used : (at your own risk)
   RGBColor  b(static_cast<unsigned char>(0));
-  RGBAColor d(BLACK);
+  RGBAColor d(BLACK, 255);
 }
 
 BOOST_AUTO_TEST_CASE(Image_ImageConverter)

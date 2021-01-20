@@ -7,9 +7,10 @@
 
 #pragma once
 
+#include <aliceVision/system/Logger.hpp>
+
 #include <string>
 #include <iostream>
-#include <aliceVision/system/Logger.hpp>
 
 namespace aliceVision {
 namespace robustEstimation {
@@ -66,7 +67,7 @@ inline std::ostream& operator<<(std::ostream& os, ERobustEstimator e)
     return os << ERobustEstimator_enumToString(e);
 }
 
-inline std::istream& operator>>(std::istream& in, robustEstimation::ERobustEstimator& estimatorType)
+inline std::istream& operator>>(std::istream& in, ERobustEstimator& estimatorType)
 {
     std::string token;
     in >> token;

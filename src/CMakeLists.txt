@@ -1,6 +1,19 @@
-cmake_minimum_required(VERSION 3.3)
+cmake_minimum_required(VERSION 3.11)
 
-project(aliceVisionSrc LANGUAGES C CXX)
+# ==============================================================================
+# AliceVision version
+# ==============================================================================
+file(STRINGS "aliceVision/version.hpp" _ALICEVISION_VERSION_HPP_CONTENTS REGEX "#define ALICEVISION_VERSION_")
+foreach(v MAJOR MINOR REVISION)
+  if("${_ALICEVISION_VERSION_HPP_CONTENTS}" MATCHES "#define ALICEVISION_VERSION_${v} ([0-9]+)")
+    set(ALICEVISION_VERSION_${v} "${CMAKE_MATCH_1}")
+  else()
+    message(FATAL_ERROR "Failed to retrieve the AliceVision version the source code. Missing ALICEVISION_VERSION_${v}.")
+  endif()
+endforeach()
+set(ALICEVISION_VERSION ${ALICEVISION_VERSION_MAJOR}.${ALICEVISION_VERSION_MINOR}.${ALICEVISION_VERSION_REVISION})
+
+project(aliceVisionSrc LANGUAGES C CXX VERSION ${ALICEVISION_VERSION})
 
 # Guard against in-source builds
 if(${CMAKE_SOURCE_DIR} STREQUAL ${CMAKE_BINARY_DIR})
@@ -27,19 +40,6 @@ function(trilean_option NAME DESCRIPTION DEFAULT_VALUE)
   endif()
 endfunction()
 
-# ==============================================================================
-# AliceVision version
-# ==============================================================================
-file(STRINGS "aliceVision/version.hpp" _ALICEVISION_VERSION_HPP_CONTENTS REGEX "#define ALICEVISION_VERSION_")
-foreach(v MAJOR MINOR REVISION)
-  if("${_ALICEVISION_VERSION_HPP_CONTENTS}" MATCHES "#define ALICEVISION_VERSION_${v} ([0-9]+)")
-    set(ALICEVISION_VERSION_${v} "${CMAKE_MATCH_1}")
-  else()
-    message(FATAL_ERROR "Failed to retrieve the AliceVision version the source code. Missing ALICEVISION_VERSION_${v}.")
-  endif()
-endforeach()
-set(ALICEVISION_VERSION ${ALICEVISION_VERSION_MAJOR}.${ALICEVISION_VERSION_MINOR}.${ALICEVISION_VERSION_REVISION})
-
 # C++11
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -47,10 +47,10 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # ==============================================================================
 # AliceVision build options
 # ==============================================================================
-option(ALICEVISION_BUILD_SHARED "Build AliceVision shared libs" ON)
 option(ALICEVISION_BUILD_SFM "Build AliceVision SfM part" ON)
 option(ALICEVISION_BUILD_MVS "Build AliceVision MVS part" ON)
 option(ALICEVISION_BUILD_HDR "Build AliceVision HDR part" ON)
+option(ALICEVISION_BUILD_SOFTWARE "Build AliceVision command line tools." ON)
 option(ALICEVISION_BUILD_EXAMPLES "Build AliceVision samples applications." OFF)
 option(ALICEVISION_BUILD_COVERAGE "Enable code coverage generation (gcc only)" OFF)
 trilean_option(ALICEVISION_BUILD_DOC "Build AliceVision documentation" AUTO)
@@ -63,11 +63,8 @@ trilean_option(ALICEVISION_USE_ALEMBIC "Enable Alembic I/O" AUTO)
 trilean_option(ALICEVISION_USE_UNCERTAINTYTE "Enable Uncertainty computation" AUTO)
 trilean_option(ALICEVISION_USE_CUDA "Enable CUDA" ON)
 trilean_option(ALICEVISION_USE_OPENCV "Build opencv+aliceVision samples programs" OFF)
-
-# Since OpenCV 3, SIFT is no longer in the default modules. See
-# https://github.com/itseez/opencv_contrib for more informations.
-# Enable this to be able to use OpenCV SIFT in main_ComputeFeatures_OpenCV.
 option(ALICEVISION_USE_OCVSIFT "Add or not OpenCV SIFT in available features" OFF)
+mark_as_advanced(FORCE ALICEVISION_USE_OCVSIFT)
 
 option(ALICEVISION_USE_MESHSDFILTER "Use MeshSDFilter library (enable MeshDenoising and MeshDecimate)" ON)
 
@@ -75,9 +72,20 @@ option(ALICEVISION_REQUIRE_CERES_WITH_SUITESPARSE "Require Ceres with SuiteSpars
 
 option(ALICEVISION_USE_RPATH "Add RPATH on software with relative paths to libraries" ON)
 
+option(ALICEVISION_BUILD_TESTS "Build AliceVision tests" OFF)
+
+option(BUILD_SHARED_LIBS "Build shared libraries" ON)
+
 # Default build is in Release mode
 if(NOT CMAKE_BUILD_TYPE AND NOT MSVC)
   set(CMAKE_BUILD_TYPE "Release")
+endif()
+
+# ==============================================================================
+# Enable cmake UNIT TEST framework
+# ==============================================================================
+if(ALICEVISION_BUILD_TESTS AND NOT CMAKE_TESTING_ENABLED)
+  enable_testing()
 endif()
 
 # ==============================================================================
@@ -87,6 +95,10 @@ endif()
 # ==============================================================================
 include(GNUInstallDirs)
 
+if(CMAKE_BUILD_TYPE MATCHES Release)
+    message(STATUS "Force CMAKE_INSTALL_DO_STRIP in Release")
+    set(CMAKE_INSTALL_DO_STRIP TRUE)
+endif()
 
 if(ALICEVISION_USE_RPATH)
   if(APPLE)
@@ -96,7 +108,7 @@ if(ALICEVISION_USE_RPATH)
     set(CMAKE_INSTALL_RPATH "\\$ORIGIN/../${CMAKE_INSTALL_LIBDIR}:\\$ORIGIN")
   endif()
 endif()
- 
+
 
 # Set build path
 set(EXECUTABLE_OUTPUT_PATH "${ALICEVISION_ROOT}/${CMAKE_SYSTEM_NAME}-${CMAKE_SYSTEM_PROCESSOR}")
@@ -107,7 +119,7 @@ if(WIN32)
   add_definitions(-DNOMINMAX)
   add_definitions(-D_USE_MATH_DEFINES)
   if(MSVC)
-    add_definitions(/bigobj)
+    add_compile_options(/bigobj)
     add_compile_options(/MP)
   endif()
 endif()
@@ -128,15 +140,11 @@ if(${CMAKE_MAJOR_VERSION}.${CMAKE_MINOR_VERSION} VERSION_LESS 3.10)
   set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake/compatibilityCUDA)
 endif()
 
-# Set shared or static mode
-if(ALICEVISION_BUILD_SHARED)
-  set(BUILD_SHARED_LIBS ON)
+if(BUILD_SHARED_LIBS)
   if(WIN32)
     # Export all symbols from the dynamic libraries by default (avoid dllexport markup)
     set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
   endif()
-elseif()
-  set(BUILD_SHARED_LIBS OFF)
 endif()
 
 # ==============================================================================
@@ -240,7 +248,7 @@ if(ALICEVISION_HAVE_OPENMP)
   if(NOT MSVC)
     if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
       # for those using the clang with OpenMP support
-      list(APPEND ALICEVISION_LIBRARY_DEPENDENCIES iomp)
+      list(APPEND ALICEVISION_LIBRARY_DEPENDENCIES omp)
     else()
     list(APPEND ALICEVISION_LIBRARY_DEPENDENCIES gomp)
     endif()
@@ -251,7 +259,11 @@ endif()
 # Boost
 # ==============================================================================
 option(BOOST_NO_CXX11 "if Boost is compiled without C++11 support (as it is often the case in OS packages) this must be enabled to avoid symbol conflicts (SCOPED_ENUM)." OFF)
-find_package(Boost 1.60.0 QUIET COMPONENTS atomic container date_time filesystem graph log log_setup program_options regex serialization system thread timer)
+set(ALICEVISION_BOOST_COMPONENTS atomic container date_time filesystem graph log log_setup program_options regex serialization system thread timer)
+if(ALICEVISION_BUILD_TESTS)
+    set(ALICEVISION_BOOST_COMPONENT_UNITTEST unit_test_framework)
+endif()
+find_package(Boost 1.60.0 QUIET COMPONENTS ${ALICEVISION_BOOST_COMPONENTS} ${ALICEVISION_BOOST_COMPONENT_UNITTEST})
 
 if(Boost_FOUND)
   message(STATUS "Boost ${Boost_LIB_VERSION} found.")
@@ -263,9 +275,14 @@ endif()
 # Disable BOOST autolink
 add_definitions(-DBOOST_ALL_NO_LIB)
 
-# Force BOOST to use dynamic libraries (avoid link error with boost program_options)
-# https://lists.boost.org/boost-users/2009/11/54015.php
-add_definitions(-DBOOST_ALL_DYN_LINK)
+if(BUILD_SHARED_LIBS)
+  # Force BOOST to use dynamic libraries (avoid link error with boost program_options)
+  # https://lists.boost.org/boost-users/2009/11/54015.php
+  add_definitions(-DBOOST_ALL_DYN_LINK)
+  add_definitions(-DBOOST_TEST_DYN_LINK)
+else()
+  set(Boost_USE_STATIC_LIBS ON)
+endif()
 
 if(BOOST_NO_CXX11)
   # Avoid link errors on boost filesystem copy_file function
@@ -273,25 +290,29 @@ if(BOOST_NO_CXX11)
   add_definitions(-DBOOST_NO_CXX11_SCOPED_ENUMS)
 endif()
 
-include_directories(${Boost_INCLUDE_DIRS})
-link_directories(${Boost_LIBRARY_DIRS})
-add_definitions(${Boost_DEFINITIONS})
 
 # ==============================================================================
 # OpenEXR
 # ==============================================================================
-find_package(OpenEXR REQUIRED)
-if(OPENEXR_FOUND)
-  message(STATUS "OpenEXR found. (Version ${OPENEXR_VERSION})")
+find_package(OpenEXR)
+if(TARGET OpenEXR::IlmImf)
+  message(STATUS "OpenEXR found. (Version ${OpenEXR_VERSION})")
 else()
-  message(SEND_ERROR "Failed to find OpenEXR.")
+  # fallback for old openexr versions (<2.5)
+  set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake/openexr)
+  find_package(OpenEXR REQUIRED)
+  if(OPENEXR_FOUND)
+    message(STATUS "OpenEXR found (without config). (Version ${OPENEXR_VERSION})")
+  else()
+    message(SEND_ERROR "Failed to find OpenEXR.")
+  endif()
 endif()
 
 # ==============================================================================
 # OpenImageIO
 # ==============================================================================
-find_package(OpenImageIO 1.8 REQUIRED)
-if(OPENIMAGEIO_FOUND)
+find_package(OpenImageIO 2.0.9 REQUIRED)
+if(OPENIMAGEIO_FOUND OR OpenImageIO_FOUND)
   message(STATUS "OpenImageIO found.")
   if(UNIX)
     # Add DL dependency on linux
@@ -331,11 +352,9 @@ endif()
 # ==============================================================================
 find_package(Eigen3 3.3 REQUIRED)
 if(Eigen3_FOUND OR EIGEN3_FOUND)
-  # message(FATAL_ERROR "EIGEN_INCLUDE_DIR: ${EIGEN_INCLUDE_DIR}")
-  include_directories(${EIGEN_INCLUDE_DIR})
+  # message(STATUS "EIGEN_INCLUDE_DIR: ${EIGEN_INCLUDE_DIR}")
   # See https://eigen.tuxfamily.org/dox/group__TopicUnalignedArrayAssert.html
-  add_definitions("-DEIGEN_DONT_ALIGN_STATICALLY=1")
-  add_definitions("-DEIGEN_DONT_VECTORIZE=1")
+  set(AV_EIGEN_DEFINITIONS -DEIGEN_MAX_ALIGN_BYTES=0 -DEIGEN_MAX_STATIC_ALIGN_BYTES=0)
 else()
   message(FATAL_ERROR " EIGEN NOT FOUND. EIGEN_INCLUDE_DIR: ${EIGEN_INCLUDE_DIR}")
 endif()
@@ -369,7 +388,7 @@ if(ALICEVISION_BUILD_SFM)
     message(STATUS "CERES_LIBRARIES: ${CERES_LIBRARIES}")
     message(STATUS "CERES_INCLUDE_DIRS: ${CERES_INCLUDE_DIRS}")
     if(WIN32)
-        # avoid 'ERROR' macro clashing on Windows 
+        # avoid 'ERROR' macro clashing on Windows
         add_definitions(-DGLOG_NO_ABBREVIATED_SEVERITIES)
     endif()
     include_directories(${CERES_INCLUDE_DIRS})
@@ -509,6 +528,7 @@ if(ALICEVISION_BUILD_SFM)
         set(ALICEVISION_HAVE_OPENCV 1)
         message(STATUS "OpenCV found.")
       endif()
+
     elseif(ALICEVISION_USE_OPENCV STREQUAL "ON")
       message(SEND_ERROR "Failed to find OpenCV.")
     endif()
@@ -687,7 +707,7 @@ if(NOT ALICEVISION_USE_CUDA STREQUAL "OFF")
     set(CUDA_USE_STATIC_CUDA_RUNTIME OFF)
     # Workaround to force deactivation of cuda static runtime for cmake < 3.10
     set(CUDA_cudart_static_LIBRARY 0)
-  else() 
+  else()
     message(STATUS "BUILD_SHARED_LIBS OFF")
     option(CUDA_USE_STATIC_CUDA_RUNTIME "Use the static version of the CUDA runtime library if available" ON)
     set(CUDA_USE_STATIC_CUDA_RUNTIME ON)
@@ -717,10 +737,16 @@ if(ALICEVISION_HAVE_CUDA)
   message("Build Mode: ${CMAKE_BUILD_TYPE}")
 
   set(CUDA_NVCC_FLAGS_DEBUG   "${CUDA_NVCC_FLAGS_DEBUG};-G;-g")
-  set(CUDA_NVCC_FLAGS_RELEASE "${CUDA_NVCC_FLAGS_RELEASE};-O3")
-  if(NOT CUDA_VERSION_MAJOR LESS 9)
-    set(ALICEVISION_CUDA_CC_LIST_BASIC 30 35 50 52 60 61 62)
-  elseif(CUDA_VERSION_MAJOR GREATER 7)
+  # set(CUDA_NVCC_FLAGS_RELEASE "${CUDA_NVCC_FLAGS_RELEASE};-O3")
+  if(CUDA_VERSION VERSION_GREATER_EQUAL 11.1)
+    set(ALICEVISION_CUDA_CC_LIST_BASIC 35 50 52 60 61 62 70 72 75 80 86)
+  elseif(CUDA_VERSION_MAJOR GREATER_EQUAL 11)
+    set(ALICEVISION_CUDA_CC_LIST_BASIC 35 50 52 60 61 62 70 72 75 80)
+  elseif(CUDA_VERSION_MAJOR GREATER_EQUAL 10)
+    set(ALICEVISION_CUDA_CC_LIST_BASIC 30 35 50 52 60 61 62 70 72 75)
+  elseif(CUDA_VERSION_MAJOR GREATER_EQUAL 9)
+    set(ALICEVISION_CUDA_CC_LIST_BASIC 30 35 50 52 60 61 62 70)
+  elseif(CUDA_VERSION_MAJOR GREATER_EQUAL 8)
     set(ALICEVISION_CUDA_CC_LIST_BASIC 20 30 35 50 52 60 61 62)
   else()
     set(ALICEVISION_CUDA_CC_LIST_BASIC 20 30 35 50 52 )
@@ -794,7 +820,7 @@ set(ALICEVISION_INCLUDE_DIRS
         ${generatedDir}
         ${CMAKE_CURRENT_SOURCE_DIR}/dependencies
         ${LEMON_INCLUDE_DIRS}
-        ${EIGEN_INCLUDE_DIRS}
+        ${EIGEN3_INCLUDE_DIRS}
         ${CERES_INCLUDE_DIRS}
         ${UNCERTAINTYTE_INCLUDE_DIRS}
         ${MAGMA_INCLUDE_DIRS}
@@ -888,7 +914,8 @@ endif()
 # ==============================================================================
 message("\n")
 message("** AliceVision version: " ${ALICEVISION_VERSION})
-message("** Build Shared libs: " ${ALICEVISION_BUILD_SHARED})
+message("** Target architecture: " ${TARGET_ARCHITECTURE})
+message("** Build Shared libs: " ${BUILD_SHARED_LIBS})
 message("** Build SfM part: " ${ALICEVISION_BUILD_SFM})
 message("** Build MVS part: " ${ALICEVISION_BUILD_MVS})
 message("** Build AliceVision tests: " ${ALICEVISION_BUILD_TESTS})
@@ -974,59 +1001,62 @@ if(ALICEVISION_BUILD_EXAMPLES AND ALICEVISION_BUILD_SFM)
 endif()
 
 # Complete software(s) build on aliceVision libraries
-add_subdirectory(software)
-
+if(ALICEVISION_BUILD_SOFTWARE)
+  add_subdirectory(software)
+endif()
 
 # ==============================================================================
 # Install rules
 # ==============================================================================
 
-install(EXPORT aliceVision-targets
-    DESTINATION ${CMAKE_INSTALL_DATADIR}/aliceVision/cmake FILE AliceVisionTargets.cmake)
+# Include module with fuction 'write_basic_package_version_file'
+include(CMakePackageConfigHelpers)
 
-#Adapt build include paths to install path
-set(ALICEVISION_INCLUDE_DIRS
-  "${ALICEVISION_INCLUDE_DIRS}"
-  "${CMAKE_INSTALL_PREFIX}/include/aliceVision")
+# name of the exported project (cannot use PROJECT_NAME as it is AliceVisionSrc
+set(exportedProjectName "AliceVision")
+# the generated cmake config file
+set(cmakeVersionConfig "${generatedDir}/${exportedProjectName}ConfigVersion.cmake")
+# the generated cmake version file
+set(cmakeProjectConfig "${generatedDir}/${exportedProjectName}Config.cmake")
+# place to install the cmake-related files
+set(cmakeConfigInstallDir "${CMAKE_INSTALL_DATADIR}/aliceVision/cmake")
+# the name of the cmake Target file to export
+set(targetsExportName "${exportedProjectName}Targets")
 
-list(REMOVE_ITEM ALICEVISION_INCLUDE_DIRS ${generatedDir})
-string(REGEX REPLACE
-  "${CMAKE_CURRENT_SOURCE_DIR}"
-  "${CMAKE_INSTALL_PREFIX}/include"
-  ALICEVISION_INCLUDE_DIRS
-  "${ALICEVISION_INCLUDE_DIRS}"
-)
+# generate '<PROJECT-NAME>ConfigVersion.cmake'
+# Note: major version number must be the same as requested
+write_basic_package_version_file("${cmakeVersionConfig}" COMPATIBILITY SameMajorVersion)
 
-string(REGEX REPLACE
-  "dependencies"
-  "aliceVision_dependencies"
-  ALICEVISION_INCLUDE_DIRS
-  "${ALICEVISION_INCLUDE_DIRS}"
-)
+# Configure '<PROJECT-NAME>Config.cmake'
+configure_package_config_file("${CMAKE_CURRENT_SOURCE_DIR}/cmake/AliceVisionConfig.cmake.in"
+        "${cmakeProjectConfig}"
+        INSTALL_DESTINATION "${cmakeConfigInstallDir}")
 
-# Create a AliceVisionConfig.cmake file. <name>Config.cmake files are searched by
-# find_package() automatically. We configure that file so that we can put any
-# information we want in it, e.g. version numbers, include directories, etc.
-configure_file("${CMAKE_CURRENT_SOURCE_DIR}/cmake/AliceVisionConfig.cmake.in"
-               "${CMAKE_CURRENT_BINARY_DIR}/AliceVisionConfig.cmake" @ONLY)
+# this exports the targets only to be used for the in-tree compilation, do not export this
+export(EXPORT aliceVision-targets FILE "${generatedDir}/${targetsExportName}.cmake")
 
-install(FILES "${CMAKE_CURRENT_BINARY_DIR}/AliceVisionConfig.cmake"
-        DESTINATION ${CMAKE_INSTALL_DATADIR}/aliceVision/cmake)
+# generate and install the target.cmake file to be used when the library is installed.
+install(EXPORT aliceVision-targets DESTINATION ${cmakeConfigInstallDir} FILE ${targetsExportName}.cmake)
+
+# install ${PROJECT_NAME}ConfigVersion.cmake and ${PROJECT_NAME}Config.cmake
+install(FILES "${cmakeProjectConfig}" "${cmakeVersionConfig}"
+        DESTINATION "${cmakeConfigInstallDir}")
+
 
 # create the config.hpp file containing all the preprocessor definitions
 set(configfile "${generatedDir}/aliceVision/config.hpp")
 configure_file("${CMAKE_CURRENT_SOURCE_DIR}/cmake/config.hpp.in"
                "${configfile}" @ONLY)
 
-
 install(FILES "${configfile}"
         DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/aliceVision")
 
+
 # Add uninstall target
+set(cmakeUninstallFile "${CMAKE_CURRENT_BINARY_DIR}/cmake/cmake_uninstall.cmake")
 configure_file(
-  "${CMAKE_CURRENT_SOURCE_DIR}/cmake/cmake_uninstall.cmake.in"
-  "${CMAKE_CURRENT_BINARY_DIR}/cmake/cmake_uninstall.cmake"
+  "${CMAKE_CURRENT_SOURCE_DIR}/cmake/cmake_uninstall.cmake.in" ${cmakeUninstallFile}
   IMMEDIATE @ONLY
 )
 
-add_custom_target(uninstall "${CMAKE_COMMAND}" -P "${CMAKE_CURRENT_BINARY_DIR}/../cmake/cmake_uninstall.cmake")
+add_custom_target(uninstall "${CMAKE_COMMAND}" -P "${cmakeUninstallFile}")

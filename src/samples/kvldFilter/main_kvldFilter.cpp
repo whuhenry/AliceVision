@@ -9,12 +9,11 @@
 #include <aliceVision/feature/feature.hpp>
 #include <aliceVision/feature/sift/ImageDescriber_SIFT.hpp>
 #include <aliceVision/matching/RegionsMatcher.hpp>
-#include <aliceVision/multiview/homographyKernelSolver.hpp>
-#include <aliceVision/multiview/conditioning.hpp>
+#include <aliceVision/multiview/relativePose/HomographyKernel.hpp>
+#include <aliceVision/robustEstimation/conditioning.hpp>
 #include <aliceVision/matching/kvld/kvld.h>
 #include <aliceVision/matching/kvld/kvld_draw.h>
 #include <aliceVision/robustEstimation/ACRansac.hpp>
-#include <aliceVision/robustEstimation/ACRansacKernelAdaptator.hpp>
 
 #include <dependencies/vectorGraphics/svgDrawer.hpp>
 
@@ -84,6 +83,8 @@ int main(int argc, char **argv)
     return EXIT_FAILURE;
   }
 
+  std::mt19937 randomNumberGenerator;
+
   // -----------------------------
   // a. List images
   // b. Compute features and descriptor
@@ -107,7 +108,9 @@ int main(int argc, char **argv)
   // Detect regions thanks to an image_describer
   //--
   using namespace aliceVision::feature;
-  std::unique_ptr<ImageDescriber> image_describer(new ImageDescriber_SIFT(SiftParams(-1)));
+  SiftParams siftParams;
+  siftParams._firstOctave = -1;
+  std::unique_ptr<ImageDescriber> image_describer(new ImageDescriber_SIFT(siftParams));
   std::map<IndexT, std::unique_ptr<feature::Regions> > regions_perImage;
   image_describer->describe(imageL, regions_perImage[0]);
   image_describer->describe(imageR, regions_perImage[1]);
@@ -134,11 +137,11 @@ int main(int argc, char **argv)
 
     //-- Draw features :
     for (size_t i=0; i < featsL.size(); ++i )  {
-      const SIOPointFeature point = regionsL->Features()[i];
+      const PointFeature point = regionsL->Features()[i];
       DrawCircle(point.x(), point.y(), point.scale(), 255, &concat);
     }
     for (size_t i=0; i < featsR.size(); ++i )  {
-      const SIOPointFeature point = regionsR->Features()[i];
+      const PointFeature point = regionsR->Features()[i];
       DrawCircle(point.x()+imageL.Width(), point.y(), point.scale(), 255, &concat);
     }
     string out_filename = "01_features.jpg";
@@ -150,6 +153,7 @@ int main(int argc, char **argv)
   {
     // Find corresponding points
     matching::DistanceRatioMatch(
+      randomNumberGenerator,
       0.8, matching::BRUTE_FORCE_L2,
       *regions_perImage.at(0).get(),
       *regions_perImage.at(1).get(),
@@ -161,8 +165,8 @@ int main(int argc, char **argv)
     svgStream.drawImage(jpg_filenameR, imageR.Width(), imageR.Height(), imageL.Width());
     for (size_t i = 0; i < vec_PutativeMatches.size(); ++i) {
       //Get back linked feature, draw a circle and link them by a line
-      const SIOPointFeature L = regionsL->Features()[vec_PutativeMatches[i]._i];
-      const SIOPointFeature R = regionsR->Features()[vec_PutativeMatches[i]._j];
+      const PointFeature L = regionsL->Features()[vec_PutativeMatches[i]._i];
+      const PointFeature R = regionsR->Features()[vec_PutativeMatches[i]._j];
       svgStream.drawLine(L.x(), L.y(), R.x()+imageL.Width(), R.y(), svgStyle().stroke("green", 2.0));
       svgStream.drawCircle(L.x(), L.y(), L.scale(), svgStyle().stroke("yellow", 2.0));
       svgStream.drawCircle(R.x()+imageL.Width(), R.y(), R.scale(),svgStyle().stroke("yellow", 2.0));

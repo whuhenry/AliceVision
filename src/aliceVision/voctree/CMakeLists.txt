@@ -25,9 +25,9 @@ alicevision_add_library(aliceVision_voctree
     aliceVision_feature
     aliceVision_sfmData
     aliceVision_system
-    Eigen3::Eigen
+    Boost::boost
   PRIVATE_LINKS
-    ${Boost_FILESYSTEM_LIBRARY}
+    Boost::filesystem
 )
 
 # Unit tests

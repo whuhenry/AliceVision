@@ -52,7 +52,7 @@ bool readIntrinsic(const std::string & fileName, Mat3 & K);
 ///   way 1: independent cameras [R|t|f] and structure
 ///   way 2: independent cameras motion [R|t], shared focal [f] and structure
 int main() {
-
+  std::mt19937 randomNumberGenerator;
   const std::string sInputDir = string("../") + string(THIS_SOURCE_DIR) + "/imageData/SceauxCastle/";
   Image<RGBColor> image;
   const string jpg_filenameL = sInputDir + "100_7101.jpg";
@@ -93,11 +93,11 @@ int main() {
 
     //-- Draw features :
     for (size_t i=0; i < featsL.size(); ++i )  {
-      const SIOPointFeature point = regionsL->Features()[i];
+      const PointFeature point = regionsL->Features()[i];
       DrawCircle(point.x(), point.y(), point.scale(), 255, &concat);
     }
     for (size_t i=0; i < featsR.size(); ++i )  {
-      const SIOPointFeature point = regionsR->Features()[i];
+      const PointFeature point = regionsR->Features()[i];
       DrawCircle(point.x()+imageL.Width(), point.y(), point.scale(), 255, &concat);
     }
     string out_filename = "02_features.jpg";
@@ -109,6 +109,7 @@ int main() {
   {
     // Find corresponding points
     matching::DistanceRatioMatch(
+      randomNumberGenerator,
       0.8, matching::BRUTE_FORCE_L2,
       *regions_perImage.at(0).get(),
       *regions_perImage.at(1).get(),
@@ -129,8 +130,8 @@ int main() {
     svgStream.drawImage(jpg_filenameR, imageR.Width(), imageR.Height(), imageL.Width());
     for (size_t i = 0; i < vec_PutativeMatches.size(); ++i) {
       //Get back linked feature, draw a circle and link them by a line
-      const SIOPointFeature L = regionsL->Features()[vec_PutativeMatches[i]._i];
-      const SIOPointFeature R = regionsR->Features()[vec_PutativeMatches[i]._j];
+      const PointFeature L = regionsL->Features()[vec_PutativeMatches[i]._i];
+      const PointFeature R = regionsR->Features()[vec_PutativeMatches[i]._j];
       svgStream.drawLine(L.x(), L.y(), R.x()+imageL.Width(), R.y(), svgStyle().stroke("green", 2.0));
       svgStream.drawCircle(L.x(), L.y(), L.scale(), svgStyle().stroke("yellow", 2.0));
       svgStream.drawCircle(R.x()+imageL.Width(), R.y(), R.scale(),svgStyle().stroke("yellow", 2.0));
@@ -165,7 +166,7 @@ int main() {
     std::pair<size_t, size_t> size_imaL(imageL.Width(), imageL.Height());
     std::pair<size_t, size_t> size_imaR(imageR.Width(), imageR.Height());
     RelativePoseInfo relativePose_info;
-    if (!robustRelativePose(K, K, xL, xR, relativePose_info, size_imaL, size_imaR, 256))
+    if (!robustRelativePose(K, K, xL, xR, randomNumberGenerator, relativePose_info, size_imaL, size_imaR, 256))
     {
       std::cerr << " /!\\ Robust relative pose estimation failure."
         << std::endl;
@@ -183,8 +184,8 @@ int main() {
     svgStream.drawImage(jpg_filenameL, imageL.Width(), imageL.Height());
     svgStream.drawImage(jpg_filenameR, imageR.Width(), imageR.Height(), imageL.Width());
     for (size_t i = 0; i < relativePose_info.vec_inliers.size(); ++i)  {
-      const SIOPointFeature & LL = regionsL->Features()[vec_PutativeMatches[relativePose_info.vec_inliers[i]]._i];
-      const SIOPointFeature & RR = regionsR->Features()[vec_PutativeMatches[relativePose_info.vec_inliers[i]]._j];
+      const PointFeature & LL = regionsL->Features()[vec_PutativeMatches[relativePose_info.vec_inliers[i]]._i];
+      const PointFeature & RR = regionsR->Features()[vec_PutativeMatches[relativePose_info.vec_inliers[i]]._j];
       const Vec2f L = LL.coords();
       const Vec2f R = RR.coords();
       svgStream.drawLine(L.x(), L.y(), R.x()+imageL.Width(), R.y(), svgStyle().stroke("green", 2.0));
@@ -243,21 +244,23 @@ int main() {
     tinyScene.setPose(*tinyScene.views.at(1), sfmData::CameraPose(pose1));
 
     // Init structure by inlier triangulation
-    const Mat34 P1 = tinyScene.intrinsics[tinyScene.views[0]->getIntrinsicId()]->get_projective_equivalent(pose0);
-    const Mat34 P2 = tinyScene.intrinsics[tinyScene.views[1]->getIntrinsicId()]->get_projective_equivalent(pose1);
+    std::shared_ptr<camera::Pinhole> pinhole1 = std::dynamic_pointer_cast<camera::Pinhole>(tinyScene.intrinsics[tinyScene.views[0]->getIntrinsicId()]);
+    std::shared_ptr<camera::Pinhole> pinhole2 = std::dynamic_pointer_cast<camera::Pinhole>(tinyScene.intrinsics[tinyScene.views[1]->getIntrinsicId()]);
+    const Mat34 P1 = pinhole1->getProjectiveEquivalent(pose0);
+    const Mat34 P2 = pinhole2->getProjectiveEquivalent(pose1);
     sfmData::Landmarks & landmarks = tinyScene.structure;
     for (size_t i = 0; i < relativePose_info.vec_inliers.size(); ++i)  {
-      const SIOPointFeature & LL = regionsL->Features()[vec_PutativeMatches[relativePose_info.vec_inliers[i]]._i];
-      const SIOPointFeature & RR = regionsR->Features()[vec_PutativeMatches[relativePose_info.vec_inliers[i]]._j];
+      const PointFeature & LL = regionsL->Features()[vec_PutativeMatches[relativePose_info.vec_inliers[i]]._i];
+      const PointFeature & RR = regionsR->Features()[vec_PutativeMatches[relativePose_info.vec_inliers[i]]._j];
       // Point triangulation
       Vec3 X;
-      TriangulateDLT(P1, LL.coords().cast<double>(), P2, RR.coords().cast<double>(), &X);
+      multiview::TriangulateDLT(P1, LL.coords().cast<double>(), P2, RR.coords().cast<double>(), &X);
       // Reject point that is behind the camera
       if (pose0.depth(X) < 0 && pose1.depth(X) < 0)
           continue;
-      // Add a new landmark (3D point with it's 2d observations)
-      landmarks[i].observations[tinyScene.views[0]->getViewId()] = sfmData::Observation(LL.coords().cast<double>(), vec_PutativeMatches[relativePose_info.vec_inliers[i]]._i);
-      landmarks[i].observations[tinyScene.views[1]->getViewId()] = sfmData::Observation(RR.coords().cast<double>(), vec_PutativeMatches[relativePose_info.vec_inliers[i]]._j);
+      // Add a new landmark (3D point with its 2d observations)
+      landmarks[i].observations[tinyScene.views[0]->getViewId()] = sfmData::Observation(LL.coords().cast<double>(), vec_PutativeMatches[relativePose_info.vec_inliers[i]]._i, LL.scale());
+      landmarks[i].observations[tinyScene.views[1]->getViewId()] = sfmData::Observation(RR.coords().cast<double>(), vec_PutativeMatches[relativePose_info.vec_inliers[i]]._j, RR.scale());
       landmarks[i].X = X;
     }
     sfmDataIO::Save(tinyScene, "EssentialGeometry_start.ply", sfmDataIO::ESfMData::ALL);

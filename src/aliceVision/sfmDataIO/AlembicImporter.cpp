@@ -221,6 +221,7 @@ bool readPointCloud(IObject iObj, M44d mat, sfmData::SfMData &sfmdata, ESfMData 
 
     UInt32ArraySamplePtr sampleVisibilityFeatId;
     FloatArraySamplePtr sampleVisibilityFeatPos;
+    FloatArraySamplePtr sampleVisibilityFeatScale;
 
     if(userProps.getPropertyHeader("mvg_visibilityFeatId") &&
        userProps.getPropertyHeader("mvg_visibilityFeatPos") &&
@@ -232,6 +233,12 @@ bool readPointCloud(IObject iObj, M44d mat, sfmData::SfMData &sfmdata, ESfMData 
       IFloatArrayProperty propVisibilityFeatPos(userProps, "mvg_visibilityFeatPos");
       propVisibilityFeatPos.get(sampleVisibilityFeatPos);
 
+      if(userProps && userProps.getPropertyHeader("mvg_visibilityFeatScale"))
+      {
+          IFloatArrayProperty propVisibilityFeatScale(userProps, "mvg_visibilityFeatScale");
+          propVisibilityFeatScale.get(sampleVisibilityFeatScale);
+      }
+
       if(sampleVisibilityViewId->size() != sampleVisibilityFeatId->size() ||
          2*sampleVisibilityViewId->size() != sampleVisibilityFeatPos->size())
       {
@@ -241,13 +248,23 @@ bool readPointCloud(IObject iObj, M44d mat, sfmData::SfMData &sfmdata, ESfMData 
                               "# features 2D pos: " << sampleVisibilityFeatPos->size() << ".");
         return false;
       }
+
+    }
+    else {
+        ALICEVISION_LOG_WARNING("Alembic LOAD: NO OBSERVATIONS_WITH_FEATURES: "
+                                << ", mvg_visibilityFeatId: " << long(userProps.getPropertyHeader("mvg_visibilityFeatId"))
+                                << ", mvg_visibilityFeatPos: " << long(userProps.getPropertyHeader("mvg_visibilityFeatPos"))
+                                << ", OBSERVATIONS_WITH_FEATURES flag: " << bool(flags_part & ESfMData::OBSERVATIONS_WITH_FEATURES)
+                                );
     }
 
     const bool hasFeatures = (sampleVisibilityFeatId != nullptr) && (sampleVisibilityFeatId->size() > 0);
+
     std::size_t obsGlobalIndex = 0;
     for(std::size_t point3d_i = 0; point3d_i < positions->size(); ++point3d_i)
     {
-      sfmData::Landmark& landmark = sfmdata.structure[nbPointsInit + point3d_i];
+      const int landmarkId = nbPointsInit + point3d_i;
+      sfmData::Landmark& landmark = sfmdata.structure[landmarkId];
 
       // Number of observation for this 3d point
       const std::size_t visibilitySize = (*sampleVisibilitySize)[point3d_i];
@@ -259,13 +276,19 @@ bool readPointCloud(IObject iObj, M44d mat, sfmData::SfMData &sfmdata, ESfMData 
         if(hasFeatures)
         {
           const int featId = (*sampleVisibilityFeatId)[obsGlobalIndex];
-          sfmData::Observation& observations = landmark.observations[viewId];
-          observations.id_feat = featId;
+          sfmData::Observation& observation = landmark.observations[viewId];
+          observation.id_feat = featId;
 
           const float posX = (*sampleVisibilityFeatPos)[2 * obsGlobalIndex];
           const float posY = (*sampleVisibilityFeatPos)[2 * obsGlobalIndex + 1];
-          observations.x[0] = posX;
-          observations.x[1] = posY;
+          observation.x[0] = posX;
+          observation.x[1] = posY;
+
+          // for compatibility with previous version without scale
+          if(sampleVisibilityFeatScale)
+          {
+              observation.scale = (*sampleVisibilityFeatScale)[obsGlobalIndex];
+          }
         }
         else
         {
@@ -295,10 +318,14 @@ bool readCamera(const ICamera& camera, const M44d& mat, sfmData::SfMData& sfmDat
   ICompoundProperty userProps = getAbcUserProperties(cs);
   std::string imagePath;
   std::vector<unsigned int> sensorSize_pix = {0, 0};
-  std::string mvg_intrinsicType = EINTRINSIC_enumToString(PINHOLE_CAMERA);
+  std::vector<double> sensorSize_mm = {0, 0};
+  std::string mvg_intrinsicType = EINTRINSIC_enumToString(EINTRINSIC::PINHOLE_CAMERA);
   std::string mvg_intrinsicInitializationMode = EIntrinsicInitMode_enumToString(EIntrinsicInitMode::CALIBRATED);
   std::vector<double> mvg_intrinsicParams;
   double initialFocalLengthPix = -1;
+  double fisheyeCenterX = 0.0;
+  double fisheyeCenterY = 0.0;
+  double fisheyeRadius = 1.0;
   std::vector<std::string> rawMetadata;
   IndexT viewId = sfmData.getViews().size();
   IndexT poseId = sfmData.getViews().size();
@@ -424,6 +451,14 @@ bool readCamera(const ICamera& camera, const M44d& mat, sfmData::SfMData& sfmDat
         }
         assert(sensorSize_pix.size() == 2);
       }
+      if(userProps.getPropertyHeader("mvg_sensorSizeMm"))
+      {
+        getAbcArrayProp<Alembic::Abc::IDoubleArrayProperty>(userProps, "mvg_sensorSizeMm", sampleFrame, sensorSize_mm);
+        assert(sensorSize_mm.size() == 2);
+      }
+      else {
+        sensorSize_mm = {24.0, 36.0};
+      }
       if(const Alembic::Abc::PropertyHeader *propHeader = userProps.getPropertyHeader("mvg_intrinsicType"))
       {
         mvg_intrinsicType = getAbcProp<Alembic::Abc::IStringProperty>(userProps, *propHeader, "mvg_intrinsicType", sampleFrame);
@@ -436,10 +471,22 @@ bool readCamera(const ICamera& camera, const M44d& mat, sfmData::SfMData& sfmDat
       {
         initialFocalLengthPix = getAbcProp<Alembic::Abc::IDoubleProperty>(userProps, *propHeader, "mvg_initialFocalLengthPix", sampleFrame);
       }
+      if(const Alembic::Abc::PropertyHeader *propHeader = userProps.getPropertyHeader("mvg_fisheyeCircleCenterX"))
+      {
+        fisheyeCenterX = getAbcProp<Alembic::Abc::IDoubleProperty>(userProps, *propHeader, "mvg_fisheyeCircleCenterX", sampleFrame);
+      }
+      if(const Alembic::Abc::PropertyHeader *propHeader = userProps.getPropertyHeader("mvg_fisheyeCircleCenterY"))
+      {
+        fisheyeCenterY = getAbcProp<Alembic::Abc::IDoubleProperty>(userProps, *propHeader, "mvg_fisheyeCircleCenterY", sampleFrame);
+      }
+      if(const Alembic::Abc::PropertyHeader *propHeader = userProps.getPropertyHeader("mvg_fisheyeCircleRadius"))
+      {
+        fisheyeRadius = getAbcProp<Alembic::Abc::IDoubleProperty>(userProps, *propHeader, "mvg_fisheyeCircleRadius", sampleFrame);
+      }
       if(userProps.getPropertyHeader("mvg_intrinsicParams"))
       {
         Alembic::Abc::IDoubleArrayProperty prop(userProps, "mvg_intrinsicParams");
-        std::shared_ptr<DoubleArraySample> sample;
+        Alembic::Abc::IDoubleArrayProperty::sample_ptr_type sample;
         prop.get(sample, ISampleSelector(sampleFrame));
         mvg_intrinsicParams.assign(sample->get(), sample->get()+sample->size());
       }
@@ -458,20 +505,33 @@ bool readCamera(const ICamera& camera, const M44d& mat, sfmData::SfMData& sfmDat
     // imgHeight = vaperture_cm * 10.0 * mm2pix;
 
     // create intrinsic parameters object
-    std::shared_ptr<Pinhole> pinholeIntrinsic = createPinholeIntrinsic(EINTRINSIC_stringToEnum(mvg_intrinsicType));
+    std::shared_ptr<camera::IntrinsicBase> intrinsic = createIntrinsic(EINTRINSIC_stringToEnum(mvg_intrinsicType));
 
-    pinholeIntrinsic->setWidth(sensorSize_pix.at(0));
-    pinholeIntrinsic->setHeight(sensorSize_pix.at(1));
-    pinholeIntrinsic->updateFromParams(mvg_intrinsicParams);
-    pinholeIntrinsic->setInitialFocalLengthPix(initialFocalLengthPix);
-    pinholeIntrinsic->setInitializationMode(EIntrinsicInitMode_stringToEnum(mvg_intrinsicInitializationMode));
+    intrinsic->setWidth(sensorSize_pix.at(0));
+    intrinsic->setHeight(sensorSize_pix.at(1));
+    intrinsic->setSensorWidth(sensorSize_mm.at(0));
+    intrinsic->setSensorHeight(sensorSize_mm.at(1));
+    intrinsic->updateFromParams(mvg_intrinsicParams);
+    intrinsic->setInitializationMode(EIntrinsicInitMode_stringToEnum(mvg_intrinsicInitializationMode));
+
+    std::shared_ptr<camera::IntrinsicsScaleOffset> intrinsicScale = std::dynamic_pointer_cast<camera::IntrinsicsScaleOffset>(intrinsic);
+    if (intrinsicScale) {
+      intrinsicScale->setInitialScale(initialFocalLengthPix);
+    }
+
+    std::shared_ptr<camera::EquiDistant> casted = std::dynamic_pointer_cast<camera::EquiDistant>(intrinsic);
+    if (casted) {
+      casted->setCircleCenterX(fisheyeCenterX);
+      casted->setCircleCenterY(fisheyeCenterY);
+      casted->setCircleRadius(fisheyeRadius);
+    }
 
     if(intrinsicLocked)
-      pinholeIntrinsic->lock();
+      intrinsic->lock();
     else
-      pinholeIntrinsic->unlock();
+      intrinsic->unlock();
 
-    sfmData.intrinsics[intrinsicId] = pinholeIntrinsic;
+    sfmData.intrinsics[intrinsicId] = intrinsic;
   }
 
   // add imported data to the SfMData container TODO use UID

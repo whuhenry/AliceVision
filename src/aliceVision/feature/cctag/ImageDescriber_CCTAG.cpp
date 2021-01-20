@@ -29,10 +29,6 @@ ImageDescriber_CCTAG::CCTagParameters::CCTagParameters(size_t nRings)
 #endif
 }
 
-ImageDescriber_CCTAG::CCTagParameters::~CCTagParameters()
-{
-}
-
 bool ImageDescriber_CCTAG::CCTagParameters::setPreset(EImageDescriberPreset preset)
 {
   switch(preset)
@@ -60,9 +56,6 @@ ImageDescriber_CCTAG::ImageDescriber_CCTAG(const std::size_t nRings)
   , _params(nRings)
   {}
 
-ImageDescriber_CCTAG::~ImageDescriber_CCTAG()
-{
-}
 
 bool ImageDescriber_CCTAG::useCuda() const
 {
@@ -74,9 +67,9 @@ void ImageDescriber_CCTAG::allocate(std::unique_ptr<Regions> &regions) const
   regions.reset( new CCTAG_Regions );
 }
 
-void ImageDescriber_CCTAG::setConfigurationPreset(EImageDescriberPreset preset)
+void ImageDescriber_CCTAG::setConfigurationPreset(ConfigurationPreset preset)
 {
-  _params.setPreset(preset);
+  _params.setPreset(preset.descPreset);
 }
 
 EImageDescriberType ImageDescriber_CCTAG::getDescriberType() const
@@ -122,10 +115,12 @@ bool ImageDescriber_CCTAG::describe(const image::Image<unsigned char>& image,
 #else //todo: #ifdef depreciated
   cctag::MemoryPool::instance().updateMemoryAuthorizedWithRAM();
   cctag::View cctagView((const unsigned char *) image.data(), image.Width(), image.Height(), image.Depth()*image.Width());
-  boost::ptr_list<cctag::ICCTag> cctags;
   cctag::cctagDetection(cctags, _cudaPipe, 1 ,cctagView._grayView ,*_params._internalParams, durations );
 #endif
   durations->print( std::cerr );
+
+  // There is no notion of orientation in CCTag
+  const float orientation = 0.0f;
 
   for (const auto & cctag : cctags)
   {
@@ -141,7 +136,8 @@ bool ImageDescriber_CCTAG::describe(const image::Image<unsigned char>& image,
       }
       desc[cctag.id()] = (unsigned char) 255;
       regionsCasted->Descriptors().push_back(desc);
-      regionsCasted->Features().push_back(SIOPointFeature(cctag.x(), cctag.y()));
+      const float scale = std::max(cctag.rescaledOuterEllipse().a(), cctag.rescaledOuterEllipse().b());
+      regionsCasted->Features().push_back(PointFeature(cctag.x(), cctag.y(), scale, orientation));
     }
   }
 

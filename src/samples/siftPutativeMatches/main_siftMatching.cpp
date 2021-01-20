@@ -27,7 +27,7 @@ using namespace svg;
 using namespace std;
 
 int main() {
-
+  std::mt19937 randomNumberGenerator;
   Image<RGBColor> image;
   string jpg_filenameL = string("../") + string(THIS_SOURCE_DIR) + "/imageData/StanfordMobileVisualSearch/Ace_0.png";
   string jpg_filenameR = string("../") + string(THIS_SOURCE_DIR) + "/imageData/StanfordMobileVisualSearch/Ace_1.png";
@@ -67,11 +67,11 @@ int main() {
 
     //-- Draw features :
     for (size_t i=0; i < featsL.size(); ++i )  {
-      const SIOPointFeature point = regionsL->Features()[i];
+      const PointFeature point = regionsL->Features()[i];
       DrawCircle(point.x(), point.y(), point.scale(), 255, &concat);
     }
     for (size_t i=0; i < featsR.size(); ++i )  {
-      const SIOPointFeature point = regionsR->Features()[i];
+      const PointFeature point = regionsR->Features()[i];
       DrawCircle(point.x()+imageL.Width(), point.y(), point.scale(), 255, &concat);
     }
     const std::string out_filename = "01_features.jpg";
@@ -83,6 +83,7 @@ int main() {
   {
     // Find corresponding points
     matching::DistanceRatioMatch(
+      randomNumberGenerator,
       0.8, matching::BRUTE_FORCE_L2,
       *regions_perImage.at(0).get(),
       *regions_perImage.at(1).get(),
@@ -94,8 +95,8 @@ int main() {
     svgStream.drawImage(jpg_filenameR, imageR.Width(), imageR.Height(), imageL.Width());
     for (size_t i = 0; i < vec_PutativeMatches.size(); ++i) {
       //Get back linked feature, draw a circle and link them by a line
-      const SIOPointFeature L = regionsL->Features()[vec_PutativeMatches[i]._i];
-      const SIOPointFeature R = regionsR->Features()[vec_PutativeMatches[i]._j];
+      const PointFeature L = regionsL->Features()[vec_PutativeMatches[i]._i];
+      const PointFeature R = regionsR->Features()[vec_PutativeMatches[i]._j];
       svgStream.drawLine(L.x(), L.y(), R.x()+imageL.Width(), R.y(), svgStyle().stroke("green", 2.0));
       svgStream.drawCircle(L.x(), L.y(), L.scale(), svgStyle().stroke("yellow", 2.0));
       svgStream.drawCircle(R.x()+imageL.Width(), R.y(), R.scale(),svgStyle().stroke("yellow", 2.0));

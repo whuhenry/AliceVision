@@ -9,6 +9,7 @@
 
 #include <aliceVision/types.hpp>
 
+#include <regex>
 #include <string>
 #include <utility>
 
@@ -111,6 +112,15 @@ public:
   }
 
   /**
+   * @brief Get view image height
+   * @return image height
+   */
+  std::pair<std::size_t, std::size_t> getImgSize() const
+  {
+    return {_width, _height};
+  }
+
+  /**
    * @brief Get the view id
    * @return view id
    */
@@ -183,101 +193,77 @@ public:
   }
 
   /**
-   * @brief xxx
-   * @return true if the view is xxx
+   * @brief If the view is part of a camera rig, the camera can be a sub-pose of the rig pose but can also be temporarily solved independently.
+   * @return true if the view is not part of a rig.
+   *         true if the view is part of a rig and the camera is solved separately.
+   *         false if the view is part of a rig and the camera is solved as a sub-pose of the rig pose.
    */
   bool isPoseIndependant() const
   {
     return (!isPartOfRig() || _isIndependantPose);
   }
 
-  float getEv() const
-  {
-      const float shutter = getMetadataShutter();
-      const float aperture = getMetadataAperture();
-      const float iso = static_cast<float>(getMetadataISO());
-
-      if(shutter < 0 || aperture < 0 || iso < 0)
-          return -1;
-
-      // WIKIPEDIA : + log2f(iso/100.f)
-      float ev = log2f(std::pow(aperture, 2.0f) / shutter) - log2f(iso/100.f);
-      return ev;
-  }
+  /**
+   * @brief Get the Camera Exposure Setting value.
+   * For the same scene, this value is linearly proportional to the amount of light captured by the camera according to
+   * the shooting parameters (shutter speed, f-number, iso).
+   */
+  float getCameraExposureSetting(const float referenceISO = 100.0f, const float referenceFNumber = 1.0f) const;
 
   /**
-   * @brief Get the value of the gap bewteen the view's exposition and a reference exposition
-   * @param [refEv] the median exposition of all views
-   * @return the exposure compensation
+   * @brief Get the Exposure Value. EV is a number that represents a combination of a camera's shutter speed and
+   * f-number, such that all combinations that yield the same exposure have the same EV.
+   * It progresses in a linear sequence as camera exposure is changed in power-of-2 steps.
    */
-  float getEvCompensation(float refEv) const
-    {
-        const float ev = getEv();
-        if(ev == -1)
-            return 1.0f;
+  float getEv() const;
 
-        return std::pow(2.0f, ev - refEv);
-    }
-
+  /**
+   * @brief Get an iterator on the map of metadata from a given name.
+   */
+  std::map<std::string, std::string>::const_iterator findMetadataIterator(const std::string& name) const;
 
   /**
    * @brief Return true if the given metadata name exists
-   * @param[in] name The metadata name
+   * @param[in] names List of possible names for the metadata
    * @return true if the corresponding metadata value exists
    */
-  bool hasMetadata(const std::string& name) const
-  {
-    return (_metadata.find(name) != _metadata.end());
-  }
+  bool hasMetadata(const std::vector<std::string>& names) const;
 
   /**
    * @brief Return true if the given metadata name exists and is a digit
-   * @param[in] name The metadata name
+   * @param[in] names List of possible names for the metadata
    * @param[in] isPositive true if the metadata must be positive
    * @return true if the corresponding metadata value exists
    */
-  bool hasDigitMetadata(const std::string& name, bool isPositive = true) const
-  {
-    double value = -1.0;
-    const auto it = _metadata.find(name);
-
-    if(it == _metadata.end() || it->second.empty())
-      return false;
-
-    try
-    {
-      value = std::stod(it->second);
-    }
-    catch(std::exception &)
-    {
-      return false;
-    }
-    return (!isPositive || (value > 0));
-  }
+  bool hasDigitMetadata(const std::vector<std::string>& names, bool isPositive = true) const;
 
   /**
-   * @brief Get the corresponding metadata value for the given name
-   * @param[in] name The metadata name
-   * @return the metadata value string
+   * @brief Get the metadata value as a string
+   * @param[in] names List of possible names for the metadata
+   * @return the metadata value as a string or an empty string if it does not exist
    */
-  const std::string& getMetadata(const std::string& name) const
-  {
-    assert(hasMetadata(name));
-    return _metadata.at(name);
-  }
+  const std::string& getMetadata(const std::vector<std::string>& names) const;
 
   /**
-   * @brief Get the corresponding metadata value for the given name or an empty string
-   * @param[in] name The metadata name
-   * @return the metadata value string or "" if no corresponding value
+   * @brief Read a floating point value from a string. It support an integer, a floating point value or a fraction.
+   * @param[in] str string with the number to evaluate
+   * @return the extracted floating point value or -1.0 if it fails to convert the string
    */
-  const std::string& getMetadataOrEmpty(const std::string& name) const
-  {
-    static std::string emptyString = "";
-    if(hasMetadata(name))
-      return _metadata.at(name);
-    return emptyString;
-  }
+  double readRealNumber(const std::string& str) const;
+
+  /**
+   * @brief Get the metadata value as a double
+   * @param[in] names List of possible names for the metadata
+   * @return the metadata value as a double or -1.0 if it does not exist
+   */
+  double getDoubleMetadata(const std::vector<std::string>& names) const;
+
+  /**
+   * @brief Get the metadata value as an integer
+   * @param[in] names List of possible names for the metadata
+   * @return the metadata value as an integer or -1 if it does not exist
+   */
+  int getIntMetadata(const std::vector<std::string>& names) const;
 
   /**
    * @brief Get the corresponding "Make" metadata value
@@ -285,12 +271,7 @@ public:
    */
   const std::string& getMetadataMake() const
   {
-    static std::string emptyString = "";
-    if(hasMetadata("Make"))
-      return getMetadata("Make");
-    if(hasMetadata("cameraMake"))
-      return getMetadata("cameraMake");
-    return emptyString;
+    return getMetadata({"Make", "cameraMake", "camera make"});
   }
 
   /**
@@ -299,12 +280,7 @@ public:
    */
   const std::string& getMetadataModel() const
   {
-    static std::string emptyString = "";
-    if(hasMetadata("Model"))
-      return getMetadata("Model");
-    if(hasMetadata("cameraModel"))
-      return getMetadata("cameraModel");
-    return emptyString;
+      return getMetadata({"Model", "cameraModel", "cameraModelName", "camera model", "camera model name"});
   }
 
   /**
@@ -313,12 +289,7 @@ public:
    */
   const std::string& getMetadataBodySerialNumber() const
   {
-    static std::string emptyString = "";
-    if(hasMetadata("Exif:BodySerialNumber"))
-      return getMetadata("Exif:BodySerialNumber");
-    if(hasMetadata("cameraSerialNumber:"))
-      return getMetadata("cameraSerialNumber:");
-    return emptyString;
+    return getMetadata({"Exif:BodySerialNumber", "cameraSerialNumber", "SerialNumber", "Serial Number"});
   }
 
   /**
@@ -327,12 +298,7 @@ public:
    */
   const std::string& getMetadataLensSerialNumber() const
   {
-    static std::string emptyString = "";
-    if(hasMetadata("Exif:LensSerialNumber"))
-      return getMetadata("Exif:LensSerialNumber");
-    if(hasMetadata("lensSerialNumber"))
-      return getMetadata("lensSerialNumber");
-    return emptyString;
+    return getMetadata({"Exif:LensSerialNumber", "lensSerialNumber", "lens serial number"});
   }
 
   /**
@@ -341,32 +307,34 @@ public:
    */
   double getMetadataFocalLength() const
   {
-    if(hasDigitMetadata("Exif:FocalLength"))
-      return std::stod(getMetadata("Exif:FocalLength"));
-    if(hasDigitMetadata("focalLength"))
-      return std::stod(getMetadata("focalLength"));
-    return -1;
+    return getDoubleMetadata({"Exif:FocalLength", "focalLength", "focal length"});
   }
 
   /**
-     * @brief Get the corresponding "ExposureTime" (shutter) metadata value
-     * @return the metadata value float or -1 if no corresponding value
-     */
-  float getMetadataShutter() const
+   * @brief Get the corresponding "ExposureTime" (shutter) metadata value
+   * @return the metadata value float or -1 if no corresponding value
+   */
+  double getMetadataShutter() const
   {
-      if(hasDigitMetadata("ExposureTime"))
-          return std::stof(getMetadata("ExposureTime"));
-      return -1;
+      return getDoubleMetadata({"ExposureTime", "Shutter Speed Value"});
   }
 
   /**
-     * @brief Get the corresponding "FNumber" (aperture) metadata value
-     * @return the metadata value float or -1 if no corresponding value
-     */
-  float getMetadataAperture() const
+   * @brief Get the corresponding "FNumber" (relative aperture) metadata value
+   * @return the metadata value float or -1 if no corresponding value
+   */
+  double getMetadataFNumber() const
   {
-      if(hasDigitMetadata("FNumber"))
-          return std::stof(getMetadata("FNumber"));
+      if(hasDigitMetadata({"FNumber"}))
+      {
+          return getDoubleMetadata({"FNumber"});
+      }
+      if (hasDigitMetadata({"ApertureValue", "Aperture Value"}))
+      {
+          const double aperture = getDoubleMetadata({"ApertureValue", "Aperture Value"});
+          // fnumber = 2^(aperture/2)
+          return std::pow(2.0, aperture / 2.0);
+      }
       return -1;
   }
 
@@ -374,11 +342,9 @@ public:
      * @brief Get the corresponding "PhotographicSensitivity" (ISO) metadata value
      * @return the metadata value int or -1 if no corresponding value
      */
-  float getMetadataISO() const
+  double getMetadataISO() const
   {
-      if(hasDigitMetadata("Exif:PhotographicSensitivity"))
-          return std::stoi(getMetadata("Exif:PhotographicSensitivity"));
-      return -1;
+    return getDoubleMetadata({"Exif:PhotographicSensitivity", "PhotographicSensitivity", "Photographic Sensitivity", "ISO"});
   }
 
   /**
@@ -387,9 +353,52 @@ public:
    */
   EEXIFOrientation getMetadataOrientation() const
   {
-    if(hasDigitMetadata("Orientation"))
-      return  static_cast<EEXIFOrientation>(std::stoi(getMetadata("Orientation")));
-    return EEXIFOrientation::UNKNOWN;
+    const int orientation = getIntMetadata({"Exif:Orientation", "Orientation"});
+    if(orientation < 0)
+      return EEXIFOrientation::UNKNOWN;
+    return static_cast<EEXIFOrientation>(orientation);
+  }
+
+  const bool getApplyWhiteBalance() const 
+  {
+    if (getIntMetadata({"AliceVision:useWhiteBalance"}) == 0)
+    {
+      return false;
+    }
+    
+    return true;
+  }
+
+  const bool hasMetadataDateTimeOriginal() const
+  {
+      return hasMetadata(
+          {"Exif:DateTimeOriginal", "DateTimeOriginal", "DateTime", "Date Time", "Create Date", "ctime"});
+  }
+
+  const std::string& getMetadataDateTimeOriginal() const
+  {
+    return getMetadata({"Exif:DateTimeOriginal", "DateTimeOriginal", "DateTime", "Date Time", "Create Date", "ctime"});
+  }
+
+  int64_t getMetadataDateTimestamp() const {
+
+    std::smatch sm;
+    std::string dtstring = getMetadataDateTimeOriginal();
+    std::regex regex("([\\d]+):([\\d]+):([\\d]+) ([\\d]+):([\\d]+):([\\d]+)");
+    
+    if (!std::regex_match(dtstring, sm, regex)) {
+      return -1;
+    }
+    
+    int64_t year = std::stoi(sm[1]);
+    int64_t month = std::stoi(sm[2]);
+    int64_t day = std::stoi(sm[3]);
+    int64_t hour = std::stoi(sm[4]);
+    int64_t minutes = std::stoi(sm[5]);
+    int64_t seconds = std::stoi(sm[6]);
+    int64_t timecode = ((((((((year * 12) + month) * 31) + day) * 24) + hour) * 60 + minutes) * 60) + seconds;
+
+    return timecode;
   }
 
   /**
@@ -510,7 +519,7 @@ public:
    */
   void addMetadata(const std::string& key, const std::string& value)
   {
-    _metadata.emplace(key, value);
+    _metadata[key] = value;
   }
 
 private:

@@ -19,18 +19,19 @@ class StructureEstimationFromKnownPoses
 public:
 
   /// Use geometry of the views to compute a putative structure from features and descriptors.
-  void run(
-    sfmData::SfMData& sfmData,
+  void run(sfmData::SfMData& sfmData,
     const PairSet& pairs,
-    const feature::RegionsPerView& regionsPerView);
+    const feature::RegionsPerView& regionsPerView,
+    std::mt19937 &randomNumberGenerator, 
+    double geometricErrorMax);
 
 public:
 
   /// Use guided matching to find corresponding 2-view correspondences
-  void match(
-    const sfmData::SfMData& sfmData,
+  void match(const sfmData::SfMData& sfmData,
     const PairSet& pairs,
-    const feature::RegionsPerView& regionsPerView);
+    const feature::RegionsPerView& regionsPerView,
+    double geometricErrorMax);
 
   /// Filter inconsistent correspondences by using 3-view correspondences on view triplets
   void filter(
@@ -41,7 +42,10 @@ public:
   /// Init & triangulate landmark observations from validated 3-view correspondences
   void triangulate(
     sfmData::SfMData& sfmData,
-    const feature::RegionsPerView& regionsPerView);
+    const feature::RegionsPerView& regionsPerView,
+    std::mt19937 &randomNumberGenerator);
+
+  const matching::PairwiseMatches& getPutativesMatches() const { return _putativeMatches; }
 
 private:
   //--

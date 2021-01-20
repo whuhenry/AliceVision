@@ -26,7 +26,8 @@ alicevision_add_library(aliceVision_dataio
     aliceVision_sfmData
     aliceVision_sfmDataIO
     aliceVision_system
-    ${Boost_FILESYSTEM_LIBRARY}
+    Boost::filesystem
+    Boost::boost
 )
 
 if(ALICEVISION_HAVE_OPENCV)

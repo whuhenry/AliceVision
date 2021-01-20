@@ -6,6 +6,7 @@
 
 #include <aliceVision/system/cmdline.hpp>
 #include <aliceVision/system/Logger.hpp>
+#include <aliceVision/system/main.hpp>
 #include <aliceVision/system/Timer.hpp>
 #include <aliceVision/mvsUtils/common.hpp>
 
@@ -32,7 +33,7 @@ using namespace aliceVision;
 namespace bfs = boost::filesystem;
 namespace po = boost::program_options;
 
-int main(int argc, char* argv[])
+int aliceVision_main(int argc, char* argv[])
 {
     system::Timer timer;
 
@@ -75,7 +76,7 @@ int main(int argc, char* argv[])
         ("meshUpdateMethod", po::value<int>(&meshUpdateMethod)->default_value(meshUpdateMethod),
             "Mesh Update Method: \n"
             "* ITERATIVE_UPDATE(" BOOST_PP_STRINGIZE(SDFilter::MeshFilterParameters::ITERATIVE_UPDATE) ") (default): ShapeUp styled iterative solver\n"
-            "* POISSON_UPDATE(" BOOST_PP_STRINGIZE(SDFilter::MeshFilterParameters::POISSON_UPDATE) "): Poisson-based update from [Want et al. 2015]\n");
+            "* POISSON_UPDATE(" BOOST_PP_STRINGIZE(SDFilter::MeshFilterParameters::POISSON_UPDATE) "): Poisson-based update from [Wang et al. 2015] \"Rolling guidance normal filter for geometric processing\"\n");
 
     po::options_description logParams("Log parameters");
     logParams.add_options()

@@ -9,14 +9,16 @@
 #include <aliceVision/sfmDataIO/sfmDataIO.hpp>
 #include <aliceVision/sfm/pipeline/regionsIO.hpp>
 #include <aliceVision/sfm/pipeline/pairwiseMatchesIO.hpp>
-#include <aliceVision/feature/svgVisualization.hpp>
+#include <aliceVision/matching/svgVisualization.hpp>
 #include <aliceVision/feature/feature.hpp>
 #include <aliceVision/matching/IndMatch.hpp>
 #include <aliceVision/matching/io.hpp>
-#include <aliceVision/track/Track.hpp>
+#include <aliceVision/track/TracksBuilder.hpp>
+#include <aliceVision/track/tracksUtils.hpp>
 #include <aliceVision/image/all.hpp>
 #include <aliceVision/system/Logger.hpp>
 #include <aliceVision/system/cmdline.hpp>
+#include <aliceVision/system/main.hpp>
 
 #include <software/utils/sfmHelper/sfmIOHelper.hpp>
 
@@ -41,7 +43,7 @@ using namespace svg;
 namespace po = boost::program_options;
 namespace fs = boost::filesystem;
 
-int main(int argc, char ** argv)
+int aliceVision_main(int argc, char ** argv)
 {
   // command-line parameters
 
@@ -50,6 +52,8 @@ int main(int argc, char ** argv)
   std::string outputFolder;
   std::vector<std::string> featuresFolders;
   std::vector<std::string> matchesFolders;
+  bool clearForks = true;
+  int minTrackLength = 2;
 
   // user optional parameters
 
@@ -70,6 +74,10 @@ int main(int argc, char ** argv)
 
   po::options_description optionalParams("Optional parameters");
   optionalParams.add_options()
+    ("clearForks", po::value<bool>(&clearForks),
+      "Filter tracks forks.")
+    ("minTrackLength", po::value<int>(&minTrackLength),
+      "Minimum track length.")
     ("describerTypes,d", po::value<std::string>(&describerTypesName)->default_value(describerTypesName),
       feature::EImageDescriberType_informations().c_str());
 
@@ -153,7 +161,7 @@ int main(int argc, char ** argv)
     const aliceVision::matching::PairwiseMatches& map_Matches = pairwiseMatches;
     track::TracksBuilder tracksBuilder;
     tracksBuilder.build(map_Matches);
-    tracksBuilder.filter();
+    tracksBuilder.filter(clearForks, minTrackLength);
     tracksBuilder.exportToSTL(mapTracks);
 
     ALICEVISION_LOG_INFO("# tracks: " << tracksBuilder.nbTracks());
@@ -190,7 +198,7 @@ int main(int argc, char ** argv)
       setImageIndex.insert(viewI->getViewId());
       setImageIndex.insert(viewJ->getViewId());
 
-      tracksUtilsMap::getCommonTracksInImages(setImageIndex, mapTracks, mapTracksCommon);
+      getCommonTracksInImages(setImageIndex, mapTracks, mapTracksCommon);
 
       if(mapTracksCommon.empty())
       {

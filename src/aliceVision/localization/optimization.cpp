@@ -68,8 +68,8 @@ bool refineSequence(std::vector<LocalizationResult> & vec_localizationResult,
       // no distortion refinement
       ALICEVISION_LOG_DEBUG("Optical distortion won't be considered");
       // just add a simple pinhole camera with the same K as the input camera
-      Vec2 pp = currIntrinsics->principal_point();
-      tinyScene.intrinsics[intrinsicID] = std::make_shared<camera::Pinhole>(currIntrinsics->_w, currIntrinsics->_h, currIntrinsics->focal(), pp(0), pp(1));
+      Vec2 pp = currIntrinsics->getPrincipalPoint();
+      tinyScene.intrinsics[intrinsicID] = std::make_shared<camera::Pinhole>(currIntrinsics->w(), currIntrinsics->h(), currIntrinsics->getFocalLengthPix(), pp(0), pp(1));
     }
     else
     {
@@ -100,6 +100,7 @@ bool refineSequence(std::vector<LocalizationResult> & vec_localizationResult,
     }
   }
   
+  const double unknownScale = 0.0;
   for(size_t viewID = 0; viewID < numViews; ++viewID)
   {
     LocalizationResult &currResult = vec_localizationResult[viewID];
@@ -165,7 +166,7 @@ bool refineSequence(std::vector<LocalizationResult> & vec_localizationResult,
         }
 
         // the 3D point exists already, add the observation
-        landmark.observations[viewID] =  sfmData::Observation(feature, match.featId);
+        landmark.observations[viewID] =  sfmData::Observation(feature, match.featId, unknownScale);
       }
       else
       {
@@ -173,7 +174,7 @@ bool refineSequence(std::vector<LocalizationResult> & vec_localizationResult,
         sfmData::Landmark newLandmark;
         newLandmark.descType = match.descType;
         newLandmark.X = currResult.getPt3D().col(idx);
-        newLandmark.observations[viewID] = sfmData::Observation(feature, match.featId);
+        newLandmark.observations[viewID] = sfmData::Observation(feature, match.featId, unknownScale);
         tinyScene.structure[match.landmarkId] = std::move(newLandmark);
       }
     }

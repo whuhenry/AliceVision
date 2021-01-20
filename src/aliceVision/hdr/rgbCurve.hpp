@@ -159,18 +159,19 @@ public:
   /**
     * @brief Set curves to Grossberg mean function of emor model
     */
-  void setEmor();
+  void setEmorInv(size_t dim = 0);
+
+
+  /**
+    * @brief Set curves to Grossberg mean function of emor model
+    */
+  void setEmor(size_t dim = 0);
 
   /**
     *@brief Set curves to gaussian
     */
-//      void setGaussian(double mu = 0.5, double sigma = 1.0 / (4.0 * sqrt(2.0)));
   void setGaussian(double mu = 0.5, double sigma = 1.0 / (5.0 * sqrt(2.0)));
 
-  /**
-   * @brief set curve to adaptative weight for Robertson
-   */
-  void setRobertsonWeight();
 
   /**
     *@brief Set curves to triangular
@@ -178,9 +179,11 @@ public:
   void setTriangular();
 
   /**
-    *@brief Set curves to plateau
+    * @brief Set curves to plateau
     */
-  void setPlateau();
+  void setPlateau(float weight = 8.0f);
+
+  void setPlateauSigmoid(float cA = 0.2, float wA = 0.5, float cB = 0.85, float wB = 0.22);
 
   /**
     *@brief Set curves to log10
@@ -193,10 +196,20 @@ public:
     */
   void inverseAllValues();
 
+  void freezeFirstPartValues();
+
+  void freezeSecondPartValues();
+
+  void invertAndScaleSecondPart(float scale);
+
   /**
     * @brief change all value of the image by their absolute value
     */
   void setAllAbsolute();
+
+  void applyGamma(float gamma = 2.2);
+
+  void applyGammaInv(float gamma = 2.2);
 
   /**
     * @brief normalize the curve
@@ -207,6 +220,11 @@ public:
     * @brief scale the curve between 0 and 1
     */
   void scale();
+
+  /**
+    * @brief scale the curve between 0 and 1
+    */
+  void scaleChannelWise();
 
   /**
     * @brief interpolates all values at zero with the previous an the next value
@@ -294,6 +312,12 @@ public:
   void write(const std::string &path, const std::string &name = "rgbCurve") const;
 
   /**
+  * @brief Write in an html file
+  * @param[in] path
+  */
+  void writeHtml(const std::string &path, const std::string& title) const;
+
+  /**
     * @brief Read and fill curves from a csv file
     * @param[in] path
     */
@@ -352,8 +376,12 @@ public:
   std::size_t getIndex(float sample, float& fractionalPart) const
   {
     assert(getSize() != 0);
+
     float infIndex;
-    fractionalPart = std::modf(std::max(0.f, std::min(1.f, sample)) * getSize() - 2, &infIndex);
+    float size = getSize() - 1.0f;
+    float valueScaled = std::max(0.f, std::min(1.f, sample)) * size;
+    fractionalPart = std::modf(valueScaled, &infIndex);
+
     return std::size_t(infIndex);
   }
 

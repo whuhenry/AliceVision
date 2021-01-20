@@ -5,15 +5,17 @@
 // v. 2.0. If a copy of the MPL was not distributed with this file,
 // You can obtain one at https://mozilla.org/MPL/2.0/.
 
-#include "aliceVision/track/Track.hpp"
+#include "aliceVision/track/TracksBuilder.hpp"
+#include "aliceVision/track/tracksUtils.hpp"
 #include "aliceVision/matching/IndMatch.hpp"
 
 #include <vector>
 #include <utility>
 
 #define BOOST_TEST_MODULE Track
-#include <boost/test/included/unit_test.hpp>
-#include <boost/test/floating_point_comparison.hpp>
+
+#include <boost/test/unit_test.hpp>
+#include <boost/test/tools/floating_point_comparison.hpp>
 
 using namespace aliceVision::feature;
 using namespace aliceVision::track;
@@ -112,7 +114,7 @@ BOOST_AUTO_TEST_CASE(Track_filter_3viewAtLeast) {
   TracksBuilder trackBuilder;
   trackBuilder.build( map_pairwisematches );
   BOOST_CHECK_EQUAL(3, trackBuilder.nbTracks());
-  trackBuilder.filter(3);
+  trackBuilder.filter(true, 3);
   BOOST_CHECK_EQUAL(2, trackBuilder.nbTracks());
 }
 
@@ -145,7 +147,7 @@ BOOST_AUTO_TEST_CASE(Track_Conflict) {
   trackBuilder.build( map_pairwisematches );
 
   BOOST_CHECK_EQUAL(3, trackBuilder.nbTracks());
-  trackBuilder.filter(); // Key feature tested here to kill the conflicted track
+  trackBuilder.filter(true, 2); // Key feature tested here to kill the conflicted track
   BOOST_CHECK_EQUAL(2, trackBuilder.nbTracks());
 
   TracksMap map_tracks;
@@ -193,11 +195,11 @@ BOOST_AUTO_TEST_CASE(Track_GetCommonTracksInImages)
     map_tracksPerView[20].push_back(6);
 
     std::set<std::size_t> set_visibleTracks;
-    tracksUtilsMap::getCommonTracksInImages(set_imageIndex, map_tracksPerView, set_visibleTracks);
+    getCommonTracksInImages(set_imageIndex, map_tracksPerView, set_visibleTracks);
     BOOST_CHECK_EQUAL(base.size(), set_visibleTracks.size());
     set_visibleTracks.clear();
     // test non-existing view index
-    tracksUtilsMap::getCommonTracksInImages({15, 50}, map_tracksPerView, set_visibleTracks);
+    getCommonTracksInImages({15, 50}, map_tracksPerView, set_visibleTracks);
     BOOST_CHECK(set_visibleTracks.empty());
   }
   {
@@ -222,7 +224,7 @@ BOOST_AUTO_TEST_CASE(Track_GetCommonTracksInImages)
     map_tracksPerView[20].push_back(6);
 
     std::set<std::size_t> set_visibleTracks;
-    tracksUtilsMap::getCommonTracksInImages(set_imageIndex, map_tracksPerView, set_visibleTracks);
+    getCommonTracksInImages(set_imageIndex, map_tracksPerView, set_visibleTracks);
     BOOST_CHECK_EQUAL(base.size(), set_visibleTracks.size());
   }
 }

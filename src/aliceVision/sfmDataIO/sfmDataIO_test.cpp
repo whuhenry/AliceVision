@@ -6,15 +6,17 @@
 // You can obtain one at https://mozilla.org/MPL/2.0/.
 
 #include <aliceVision/system/Timer.hpp>
-#include <aliceVision/sfm/sfm.hpp>
+#include <aliceVision/sfmData/SfMData.hpp>
+#include <aliceVision/sfmDataIO/sfmDataIO.hpp>
 
 #include <boost/filesystem.hpp>
 
 #include <sstream>
 
 #define BOOST_TEST_MODULE sfmDataIO
-#include <boost/test/included/unit_test.hpp>
-#include <boost/test/floating_point_comparison.hpp>
+
+#include <boost/test/unit_test.hpp>
+#include <boost/test/tools/floating_point_comparison.hpp>
 
 using namespace aliceVision;
 using namespace aliceVision::camera;
@@ -60,9 +62,10 @@ sfmData::SfMData createTestScene(std::size_t viewsCount = 2, std::size_t observa
 
   // Fill with not meaningful tracks
   sfmData::Observations observations;
+  const double unknownScale = 0.0;
   for(std::size_t i = 0; i < observationCount; ++i)
   {
-    observations[i] = sfmData::Observation( Vec2(i,i), i);
+    observations[i] = sfmData::Observation( Vec2(i,i), i, unknownScale);
   }
 
   sfmData.structure[0].observations = observations;

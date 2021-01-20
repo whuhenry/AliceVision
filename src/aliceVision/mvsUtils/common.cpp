@@ -14,6 +14,9 @@
 #include <aliceVision/mvsData/OrientedPoint.hpp>
 #include <aliceVision/mvsData/Pixel.hpp>
 
+#include <random>
+#include <numeric>
+
 namespace aliceVision {
 namespace mvsUtils {
 
@@ -404,63 +407,60 @@ StaticVector<Point3d>* lineSegmentHexahedronIntersection(Point3d& linePoint1, Po
     return out;
 }
 
-StaticVector<Point3d>* triangleRectangleIntersection(Point3d& A, Point3d& B, Point3d& C, const MultiViewParams* mp, int rc,
-                                                     Point2d P[4])
+void triangleRectangleIntersection(Point3d& A, Point3d& B, Point3d& C, const MultiViewParams& mp, int rc,
+                                                     Point2d P[4], StaticVector<Point3d>& out)
 {
     float maxd =
-        std::max(std::max((mp->CArr[rc] - A).size(), (mp->CArr[rc] - B).size()), (mp->CArr[rc] - C).size()) * 1000.0f;
+        std::max(std::max((mp.CArr[rc] - A).size(), (mp.CArr[rc] - B).size()), (mp.CArr[rc] - C).size()) * 1000.0f;
 
-    StaticVector<Point3d>* out = new StaticVector<Point3d>();
-    out->reserve(40);
+    out.reserve(40);
 
     Point3d a, b, c;
     int coplanar;
     Point3d i1, i2;
 
-    a = mp->CArr[rc];
-    b = mp->CArr[rc] + (mp->iCamArr[rc] * P[0]).normalize() * maxd;
-    c = mp->CArr[rc] + (mp->iCamArr[rc] * P[1]).normalize() * maxd;
+    a = mp.CArr[rc];
+    b = mp.CArr[rc] + (mp.iCamArr[rc] * P[0]).normalize() * maxd;
+    c = mp.CArr[rc] + (mp.iCamArr[rc] * P[1]).normalize() * maxd;
     bool ok = (bool)tri_tri_intersect_with_isectline(A.m, B.m, C.m, a.m, b.m, c.m, &coplanar, i1.m, i2.m);
     if(ok)
     {
-        out->push_back(i1);
-        out->push_back(i2);
+        out.push_back(i1);
+        out.push_back(i2);
     }
 
-    a = mp->CArr[rc];
-    b = mp->CArr[rc] + (mp->iCamArr[rc] * P[1]).normalize() * maxd;
-    c = mp->CArr[rc] + (mp->iCamArr[rc] * P[2]).normalize() * maxd;
+    a = mp.CArr[rc];
+    b = mp.CArr[rc] + (mp.iCamArr[rc] * P[1]).normalize() * maxd;
+    c = mp.CArr[rc] + (mp.iCamArr[rc] * P[2]).normalize() * maxd;
     ok = (bool)tri_tri_intersect_with_isectline(A.m, B.m, C.m, a.m, b.m, c.m, &coplanar, i1.m, i2.m);
     if(ok)
     {
-        out->push_back(i1);
-        out->push_back(i2);
+        out.push_back(i1);
+        out.push_back(i2);
     }
 
-    a = mp->CArr[rc];
-    b = mp->CArr[rc] + (mp->iCamArr[rc] * P[2]).normalize() * maxd;
-    c = mp->CArr[rc] + (mp->iCamArr[rc] * P[3]).normalize() * maxd;
+    a = mp.CArr[rc];
+    b = mp.CArr[rc] + (mp.iCamArr[rc] * P[2]).normalize() * maxd;
+    c = mp.CArr[rc] + (mp.iCamArr[rc] * P[3]).normalize() * maxd;
     ok = (bool)tri_tri_intersect_with_isectline(A.m, B.m, C.m, a.m, b.m, c.m, &coplanar, i1.m, i2.m);
     if(ok)
     {
-        out->push_back(i1);
-        out->push_back(i2);
+        out.push_back(i1);
+        out.push_back(i2);
     }
 
-    a = mp->CArr[rc];
-    b = mp->CArr[rc] + (mp->iCamArr[rc] * P[3]).normalize() * maxd;
-    c = mp->CArr[rc] + (mp->iCamArr[rc] * P[0]).normalize() * maxd;
+    a = mp.CArr[rc];
+    b = mp.CArr[rc] + (mp.iCamArr[rc] * P[3]).normalize() * maxd;
+    c = mp.CArr[rc] + (mp.iCamArr[rc] * P[0]).normalize() * maxd;
     ok = (bool)tri_tri_intersect_with_isectline(A.m, B.m, C.m, a.m, b.m, c.m, &coplanar, i1.m, i2.m);
     if(ok)
     {
-        out->push_back(i1);
-        out->push_back(i2);
+        out.push_back(i1);
+        out.push_back(i2);
     }
 
     // Point3d lp;
     // if lineSegmentPlaneIntersect(&lp,A,B,mp->CArr[rc],n);
-
-    return out;
 }
 
 bool isPointInHexahedron(const Point3d& p, const Point3d* hexah)
@@ -730,57 +730,16 @@ StaticVector<Point3d>* computeVoxels(const Point3d* space, const Voxel& dimensio
     return voxels;
 }
 
-StaticVector<int>* createRandomArrayOfIntegers(int n)
+std::vector<int> createRandomArrayOfIntegers(const int size, const unsigned int seed)
 {
-    /* initialize random seed: */
-    srand(time(nullptr));
+    std::mt19937 generator(seed != 0 ? seed : std::random_device{}());
 
-    StaticVector<int>* tracksPointsRandomIds = new StaticVector<int>();
-    tracksPointsRandomIds->reserve(n);
+    std::vector<int> v(size);
+    std::iota(v.begin(), v.end(), 0);
 
-    for(int j = 0; j < n; j++)
-    {
-        tracksPointsRandomIds->push_back(j);
-    }
+    std::shuffle(v.begin(), v.end(), generator);
 
-    for(int j = 0; j < n - 1; j++)
-    {
-        int rid = rand() % (n - j);
-
-        /*
-        if ((j+rid<0)||(j+rid>=tracksPoints->size())) {
-                printf("WANRING rid ot of limits %i, 0 to %i !!!! \n",j+rid,tracksPoints->size());
-        };
-        */
-
-        int v = (*tracksPointsRandomIds)[j + rid];
-        (*tracksPointsRandomIds)[j + rid] = (*tracksPointsRandomIds)[j];
-        (*tracksPointsRandomIds)[j] = v;
-    }
-
-    // test
-    /*
-    {
-            StaticVectorBool *tracksPointsRandomIdsB = new StaticVectorBool(n);
-            tracksPointsRandomIdsB->resize_with(n,false);
-            for (int k=0;k<n;k++) {
-                    int j = (*tracksPointsRandomIds)[k];
-                    (*tracksPointsRandomIdsB)[j] = true;
-            };
-
-
-            for (int j=0;j<n;j++) {
-                    if ((*tracksPointsRandomIdsB)[j]==false) {
-                            printf("WANRING  ((*tracksPointsRandomIdsB)[j]==false) !!!! \n");
-                    };
-            };
-
-
-            delete tracksPointsRandomIdsB;
-    };
-    */
-
-    return tracksPointsRandomIds;
+    return v;
 }
 
 int findNSubstrsInString(const std::string& str, const std::string& val)

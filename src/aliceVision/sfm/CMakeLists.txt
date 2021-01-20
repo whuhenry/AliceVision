@@ -14,12 +14,15 @@ set(sfm_files_headers
   pipeline/pairwiseMatchesIO.hpp
   pipeline/RelativePoseInfo.hpp
   pipeline/structureFromKnownPoses/StructureEstimationFromKnownPoses.hpp
+  pipeline/panorama/ReconstructionEngine_panorama.hpp
   pipeline/regionsIO.hpp
   utils/alignment.hpp
   utils/statistics.hpp
   utils/syntheticScene.hpp
   BundleAdjustment.hpp
   BundleAdjustmentCeres.hpp
+  BundleAdjustmentPanoramaCeres.hpp
+  BundleAdjustmentSymbolicCeres.hpp
   LocalBundleAdjustmentGraph.hpp
   FrustumFilter.hpp
   ResidualErrorFunctor.hpp
@@ -27,6 +30,7 @@ set(sfm_files_headers
   generateReport.hpp
   sfm.hpp
   sfmFilters.hpp
+  sfmStatistics.hpp
   sfmTriangulation.hpp
 )
 
@@ -38,18 +42,23 @@ set(sfm_files_sources
   pipeline/localization/SfMLocalizer.cpp
   pipeline/localization/SfMLocalizationSingle3DTrackObservationDatabase.cpp
   pipeline/sequential/ReconstructionEngine_sequentialSfM.cpp
+  pipeline/ReconstructionEngine.cpp
   pipeline/RigSequence.cpp
   pipeline/RelativePoseInfo.cpp
   pipeline/structureFromKnownPoses/StructureEstimationFromKnownPoses.cpp
+  pipeline/panorama/ReconstructionEngine_panorama.cpp
   pipeline/regionsIO.cpp
   utils/alignment.cpp
   utils/statistics.cpp
   utils/syntheticScene.cpp
   BundleAdjustmentCeres.cpp
+  BundleAdjustmentPanoramaCeres.cpp
+  BundleAdjustmentSymbolicCeres.cpp
   LocalBundleAdjustmentGraph.cpp
   FrustumFilter.cpp
   generateReport.cpp
   sfmFilters.cpp
+  sfmStatistics.cpp
   sfmTriangulation.cpp
 )
 
@@ -69,7 +78,8 @@ alicevision_add_library(aliceVision_sfm
     aliceVision_linearProgramming
     aliceVision_sfmData
     aliceVision_sfmDataIO
-    ${Boost_FILESYSTEM_LIBRARY}
+    Boost::filesystem
+    Boost::boost
     ${CERES_LIBRARIES}
 )
 
